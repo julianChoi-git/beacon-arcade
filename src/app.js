@@ -1,4 +1,4 @@
-import { classifyRound, digitsFromBeaconHex, evaluatePicks, hasAnyPick, scheduleRound, targetPulsePlan } from './random.js';
+import { classifyRound, digitsFromBeaconHex, evaluatePicks, hasAnyPick, scheduleRound, targetPulsePlan } from './random.js?v=546f1d6';
 
 const API = 'https://beacon.nist.gov/beacon/2.0';
 const CHAIN = 2;
