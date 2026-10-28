@@ -50,6 +50,18 @@ export function classifyRound(digits) {
   };
 }
 
+export function hasAnyPick(picks) {
+  return ['parity', 'range', 'combo'].some((key) => Boolean(picks?.[key]));
+}
+
+export function evaluatePicks(picks, outcome) {
+  return Object.fromEntries(
+    ['parity', 'range', 'combo']
+      .filter((key) => Boolean(picks?.[key]))
+      .map((key) => [key, picks[key] === outcome[key]]),
+  );
+}
+
 export function scheduleRound(nowMs) {
   const minute = 60_000;
   let openAt = Math.floor(nowMs / minute) * minute;
@@ -60,6 +72,14 @@ export function scheduleRound(nowMs) {
   }
   const pulseAt = Math.ceil((closesAt + 1) / minute) * minute;
   return { openAt, closesAt, pulseAt };
+}
+
+export function targetPulsePlan(latestPulse, targetAt) {
+  const latestAt = Date.parse(latestPulse?.timeStamp ?? '');
+  if (!Number.isFinite(latestAt)) throw new TypeError('최신 펄스 시각이 올바르지 않습니다.');
+  if (latestAt < targetAt) return { kind: 'wait' };
+  if (latestAt === targetAt) return { kind: 'use-latest', pulseIndex: latestPulse.pulseIndex };
+  return { kind: 'fetch-history', pulseIndex: pulseIndexAtTarget(latestPulse, targetAt) };
 }
 
 export function pulseIndexAtTarget(baselinePulse, targetAt) {
@@ -73,8 +93,8 @@ export function pulseIndexAtTarget(baselinePulse, targetAt) {
   }
   const intervals = (targetAt - baselineAt) / period;
   const rounded = Math.round(intervals);
-  if (rounded < 0 || Math.abs(intervals - rounded) > 0.001) {
-    throw new RangeError('대상 펄스를 기준 펄스와 주기로 정확히 계산할 수 없습니다.');
+  if (Math.abs(intervals - rounded) > 0.001) {
+    throw new RangeError('대상 시각을 기준 펄스와 주기로 정확히 계산할 수 없습니다.');
   }
   return baselinePulse.pulseIndex + rounded;
 }

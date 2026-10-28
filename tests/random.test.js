@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BYTE_LIMIT, classifyRound, digitsFromBeaconHex, pulseIndexAtTarget, scheduleRound, scoreDigit } from '../src/random.js';
+import { BYTE_LIMIT, classifyRound, digitsFromBeaconHex, evaluatePicks, hasAnyPick, pulseIndexAtTarget, scheduleRound, scoreDigit, targetPulsePlan } from '../src/random.js';
 
 test('0~249 바이트는 나머지로 숫자를 만들고 거부 바이트는 건너뛴다', () => {
   const result = digitsFromBeaconHex('00F9FAFF35');
@@ -47,8 +47,24 @@ test('라운드 접수는 정각 50초에 닫히고 그 이후 첫 정각 펄스
   assert.deepEqual(scheduleRound(at + 50_000), { openAt: at + minute, closesAt: at + minute + 50_000, pulseAt: at + minute * 2 });
 });
 
-test('기준 펄스 번호에서 대상 펄스 번호를 주기로 계산한다', () => {
+test('기준 펄스보다 과거 또는 미래인 목표 시각의 번호를 계산한다', () => {
   const baseline = { pulseIndex: 100, timeStamp: '2026-01-01T00:00:00.000Z', period: 60_000 };
   assert.equal(pulseIndexAtTarget(baseline, Date.parse('2026-01-01T00:02:00.000Z')), 102);
+  assert.equal(pulseIndexAtTarget(baseline, Date.parse('2025-12-31T23:58:00.000Z')), 98);
   assert.throws(() => pulseIndexAtTarget(baseline, Date.parse('2026-01-01T00:02:30.000Z')), /정확히 계산/);
+});
+
+test('미래 펄스는 기다리고, 정확한 최신 펄스는 그대로 쓰며, 지나간 펄스만 과거 ID로 조회한다', () => {
+  const latest = { pulseIndex: 100, timeStamp: '2026-01-01T00:00:00.000Z', period: 60_000 };
+  assert.deepEqual(targetPulsePlan(latest, Date.parse('2026-01-01T00:01:00.000Z')), { kind: 'wait' });
+  assert.deepEqual(targetPulsePlan(latest, Date.parse('2026-01-01T00:00:00.000Z')), { kind: 'use-latest', pulseIndex: 100 });
+  assert.deepEqual(targetPulsePlan(latest, Date.parse('2025-12-31T23:59:00.000Z')), { kind: 'fetch-history', pulseIndex: 99 });
+});
+
+test('예측은 한 항목만 골라도 접수되고 선택한 항목만 판정한다', () => {
+  const outcome = { parity: 'odd', range: 'over', combo: 'pair' };
+  assert.equal(hasAnyPick({}), false);
+  assert.equal(hasAnyPick({ parity: 'odd' }), true);
+  assert.deepEqual(evaluatePicks({ parity: 'odd' }, outcome), { parity: true });
+  assert.deepEqual(evaluatePicks({ range: 'under', combo: 'pair' }, outcome), { range: false, combo: true });
 });
